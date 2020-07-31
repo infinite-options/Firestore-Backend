@@ -45,7 +45,8 @@ build/Release
 
 # Dependency directories
 node_modules/
-Functions/node_modules/
+functions/node_modules/
+functions/.DS_Store
 
 # Optional npm cache directory
 .npm

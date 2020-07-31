@@ -4,33 +4,98 @@ import * as admin from 'firebase-admin';
 admin.initializeApp();
 const fs = require( 'fs' );
 const {google} = require('googleapis');
+//const axios = require('axios')
 
 const OAuth2Client = google.auth.OAuth2
 const credentials_url = 'credentials.json';
 const db = admin.firestore();
 const redirect_uri = "https://developers.google.com/oauthplayground";
 
+export const ModifyFirestoreTime = functions.https.onRequest((req, res) => {
+   
+    db.collection('users').get()
+    .then((snapshot) => {
+        snapshot.forEach(doc => {
+            if (doc.data()["goals&routines"] != null) {
+                let arrs = doc.data()["goals&routines"];
+                arrs.forEach((gr: {
+                    id: string,
+                    start_day_and_time: string,
+                    end_day_and_time: string
+                }) => { 
+                    if(gr["id"] === 'tshZhWZLHv8Dv1XbM3M4') {
+                        let startDate = new Date(gr["start_day_and_time"]).toLocaleString('en-US', {
+                            timeZone: "America/Los_Angeles"
+                        });
+                        let endDate = new Date(gr["end_day_and_time"]).toLocaleString('en-US', {
+                            timeZone: "America/Los_Angeles"
+                        });
+
+                        console.log(startDate);
+                        console.log(endDate);
+                    }
+                });
+                /*
+                db.collection("users")
+                .doc(doc.id)
+                .update({ "goals&routines": arrs });
+                */
+            }
+        });
+        res.status(200).send('All good');
+    })
+    .catch(error=>{
+        console.log('Error ',error)
+        res.status(500).send('Error.')
+    });
+});
+
 export const NotificationListener = functions
     .firestore
     .document('users/{userId}')
     .onUpdate( async (change, context) => {
 
-        //const userId = context.params.userId.toString();
-        const newVal = change.after.data()['goals&routines'];
-        const prevVal = change.before.data()['goals&routines'];
-        //var i;
+        const userId = context.params.userId.toString();
 
-        console.log(JSON.stringify(newVal));
-        console.log(JSON.stringify(prevVal))
-        /*
+        const newVal = change.after.data();
+        const prevVal = change.before.data();
+        var i;
+        let updateFlag = false;
+
+        console.log('User ID:', userId);
+
         for(i=0; i<newVal.length; i++){
-            console.log('Goal: ', JSON.stringify(newVal[i].id));
-            console.log('After: Avail ', JSON.stringify(newVal[i].is_available), '   Before:', JSON.stringify(prevVal[i].is_available));
-            console.log('After: Comp ', JSON.stringify(newVal[i].is_complete), '   Before:', JSON.stringify(prevVal[i].is_complete));
-            console.log('After: Prog ', JSON.stringify(newVal[i].is_in_progress), '   Before:', JSON.stringify(prevVal[i].is_in_progress));
-            console.log('After: Disp ', JSON.stringify(newVal[i].is_displayed_today), '   Before:', JSON.stringify(prevVal[i].is_displayed_today));
+            if (newVal['goals&routines'][i].is_available !== prevVal['goals&routines'][i].is_available ||
+                newVal['goals&routines'][i].is_complete !== prevVal['goals&routines'][i].is_complete || 
+                newVal['goals&routines'][i].is_in_progress !== prevVal['goals&routines'][i].is_in_progress || 
+                newVal['goals&routines'][i].is_displayed_today !== prevVal['goals&routines'][i].is_displayed_today || 
+                newVal['goals&routines'][i].user_notifications !== prevVal['goals&routines'][i].user_notifications) {
+
+                    console.log('Setting updateFlag to true because goal:', JSON.stringify(newVal[i].title));
+                    updateFlag = true;
+                    break;
+            }
         }
-        */
+        //console.log(updateFlag);
+        if(updateFlag){
+            if(!newVal.device_token){
+                console.log("User has no registered devices. Aborting.");
+                return;
+            }
+            const deviceTokens = newVal.device_token;
+            console.log('There are', deviceTokens.length, 'tokens to send notifications to.');
+            /*const message = {
+                data: {
+                    id: userId
+                },
+                android: {
+                    priority: "high"
+                }
+            };*/
+
+
+        }
+
         return;
         /*
         const userId = context.params.userId.toString();
@@ -77,8 +142,8 @@ export const NotificationListener = functions
 export const GetEventsForTheDay = functions.https.onRequest((req, res) => {
 
     const id = req.body.id.toString();
-    let startParam = req.body.start.toString();
-    let endParam = req.body.end.toString();
+    const startParam = req.body.start.toString();
+    const endParam = req.body.end.toString();
 
     console.log( 'start : ', startParam, ' end:', endParam );
 
@@ -96,6 +161,7 @@ export const GetEventsForTheDay = functions.https.onRequest((req, res) => {
                     maxResults:   999,
                     singleEvents: true,
                     orderBy:      'startTime'
+                    //timeZone: 
                 },
                 (error: any, response: any) => {
                     //CallBack

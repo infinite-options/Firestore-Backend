@@ -55,23 +55,38 @@ export const NotificationListener = functions
     .document('users/{userId}')
     .onUpdate( async (change, context) => {
 
+        interface notificationPayload { 
+                                        message : { 
+                                            data : { 
+                                                id: string
+                                            }
+                                        }, 
+                                        token: string 
+                                       }; 
+        
+        let payload: {
+            message: {data: {id: string}},
+            token: string
+        }                               
+        var notificationPayload = {} as notificationPayload
+        //var url = "https://fcm.googleapis.com/v1/projects/myspace-db/messages:send/";
         const userId = context.params.userId.toString();
 
         const newVal = change.after.data();
         const prevVal = change.before.data();
-        var i;
         let updateFlag = false;
-
         console.log('User ID:', userId);
 
-        for(i=0; i<newVal.length; i++){
-            if (newVal['goals&routines'][i].is_available !== prevVal['goals&routines'][i].is_available ||
+        let i;
+        for(i=0; i<newVal['goals&routines'].length; i++){
+            if (newVal['goals&routines'].length !== prevVal['goals&routines'].length ||
+                newVal['goals&routines'][i].is_available !== prevVal['goals&routines'][i].is_available ||
                 newVal['goals&routines'][i].is_complete !== prevVal['goals&routines'][i].is_complete || 
                 newVal['goals&routines'][i].is_in_progress !== prevVal['goals&routines'][i].is_in_progress || 
                 newVal['goals&routines'][i].is_displayed_today !== prevVal['goals&routines'][i].is_displayed_today || 
                 newVal['goals&routines'][i].user_notifications !== prevVal['goals&routines'][i].user_notifications) {
 
-                    console.log('Setting updateFlag to true because goal:', JSON.stringify(newVal[i].title));
+                    console.log('Setting updateFlag to true because goal:', JSON.stringify(newVal['goals&routines'][i].title));
                     updateFlag = true;
                     break;
             }
@@ -92,8 +107,15 @@ export const NotificationListener = functions
                     priority: "high"
                 }
             };*/
-
-
+            for(i=0; i<deviceTokens.length; i++){
+                payload = {
+                    message: {data: {id: userId}},
+                    token: deviceTokens[i]
+                }
+                //notificationPayload.message = { data: {id: userId} };
+                //notificationPayload.token = deviceTokens[i];
+                console.log(payload);
+            }
         }
 
         return;

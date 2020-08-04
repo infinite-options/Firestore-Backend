@@ -14,17 +14,17 @@ export const ModifyFirestoreTime = functions.https.onRequest((req, res) => {
     db.collection('users').get()
     .then((snapshot) => {
         snapshot.forEach(doc => {
-            if (doc.data()["goals&routines"] != null) {
+            if (doc.data()["goals&routines"] !== null) {
                 let arrs = doc.data()["goals&routines"];
                 arrs.forEach((gr: {
                     id: string,
                     start_day_and_time: string,
                     end_day_and_time: string
                 }) => { 
-                    let startDate = new Date(gr["start_day_and_time"]).toLocaleString('en-US', {
+                    const startDate = new Date(gr["start_day_and_time"]).toLocaleString('en-US', {
                         timeZone: "America/Los_Angeles"
                     });
-                    let endDate = new Date(gr["end_day_and_time"]).toLocaleString('en-US', {
+                    const endDate = new Date(gr["end_day_and_time"]).toLocaleString('en-US', {
                         timeZone: "America/Los_Angeles"
                     });
                     gr["start_day_and_time"] = startDate;
@@ -66,16 +66,17 @@ export const NotificationListener = functions
 
         let i;
         for(i=0; i<newVal['goals&routines'].length; i++){
+            
             if (newVal['goals&routines'].length !== prevVal['goals&routines'].length ||
                 newVal['goals&routines'][i].is_available !== prevVal['goals&routines'][i].is_available ||
                 newVal['goals&routines'][i].is_complete !== prevVal['goals&routines'][i].is_complete || 
                 newVal['goals&routines'][i].is_in_progress !== prevVal['goals&routines'][i].is_in_progress || 
                 newVal['goals&routines'][i].is_displayed_today !== prevVal['goals&routines'][i].is_displayed_today || 
-                newVal['goals&routines'][i].user_notifications !== prevVal['goals&routines'][i].user_notifications) {
+                JSON.stringify(newVal['goals&routines'][i].user_notifications) !== JSON.stringify(prevVal['goals&routines'][i].user_notifications)){
 
-                    console.log('Setting updateFlag to true because goal:', JSON.stringify(newVal['goals&routines'][i].title));
-                    updateFlag = true;
-                    break;
+                console.log('Setting updateFlag to true because goal:', JSON.stringify(newVal['goals&routines'][i].title));
+                updateFlag = true;
+                break;
             }
         }
         if(updateFlag){
@@ -92,27 +93,33 @@ export const NotificationListener = functions
             }
         
             const responses = await admin.messaging().sendMulticast(payload);
+            console.log('Success count', responses.successCount);
+            console.log('Failure count', responses.failureCount);
+            let validTokens: string[] = []
             responses.responses.forEach((response, index) => {
                 const error = response.error;
                 if(error) {
-                    console.error('Failure sending notification to', deviceTokens[index], error);
-                    // Cleanup the tokens who are not registered anymore.
+                    console.error('Failure sending notification to', deviceTokens[index]);
                     if (error.code === 'messaging/invalid-registration-token' ||
                         error.code === 'messaging/registration-token-not-registered') {
-                        deviceTokens.splice(index, 1);
+                            console.log('token notregistere: ', deviceTokens[index])
                     }
+                }
+                if(response.success){
+                    validTokens.push(deviceTokens[index])
                 }
             });
             db.collection("users")
-                    .doc(userId).update({ "device_token": deviceTokens })
+                    .doc(userId).update({ "device_token": validTokens })
                     .then((response) => {
                         console.log('Updated device tokens');
+                        return;
                     })
                     .catch((error) => {
                         console.log('error in', userId);
+                        return;
                     });
         }
-        return;
 });
 
 export const GetEventsForTheDay = functions.https.onRequest((req, res) => {

@@ -2,7 +2,8 @@ import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
 
 admin.initializeApp();
-const fs = require( 'fs' );
+const fs = require('fs');
+//const axios = require('axios');
 const {google} = require('googleapis');
 
 const OAuth2Client = google.auth.OAuth2
@@ -57,10 +58,11 @@ export const NotificationListener = functions
         const newVal = change.after.data();
         const prevVal = change.before.data();
 
-        let payload: {
-            message: {data: {id: string}},
+        let message: {
+            data: {id: string}
             tokens: []
-        }                               
+        }
+
         let updateFlag = false;
         console.log('User ID:', userId);
 
@@ -87,12 +89,12 @@ export const NotificationListener = functions
             const deviceTokens = newVal.device_token;
             console.log('There are', deviceTokens.length, 'tokens to send notifications to.');
             
-            payload = {
-                message: {data: {id: userId}},
+            message = {
+                data: {id: userId},
                 tokens: deviceTokens
             }
         
-            const responses = await admin.messaging().sendMulticast(payload);
+            const responses = await admin.messaging().sendMulticast(message);
             console.log('Success count', responses.successCount);
             console.log('Failure count', responses.failureCount);
             let validTokens: string[] = []
@@ -102,7 +104,7 @@ export const NotificationListener = functions
                     console.error('Failure sending notification to', deviceTokens[index]);
                     if (error.code === 'messaging/invalid-registration-token' ||
                         error.code === 'messaging/registration-token-not-registered') {
-                            console.log('token notregistere: ', deviceTokens[index])
+                            console.log('token not registered: ', deviceTokens[index])
                     }
                 }
                 if(response.success){
@@ -110,15 +112,15 @@ export const NotificationListener = functions
                 }
             });
             db.collection("users")
-                    .doc(userId).update({ "device_token": validTokens })
-                    .then((response) => {
-                        console.log('Updated device tokens');
-                        return;
-                    })
-                    .catch((error) => {
-                        console.log('error in', userId);
-                        return;
-                    });
+                .doc(userId).update({ "device_token": validTokens })
+                .then((response) => {
+                    console.log('Updated device tokens');
+                    return;
+                })
+                .catch((error) => {
+                    console.log('error in', userId);
+                    return;
+                });
         }
 });
 
@@ -131,7 +133,7 @@ export const GetEventsForTheDay = functions.https.onRequest((req, res) => {
     console.log( 'start : ', startParam, ' end:', endParam );
 
     setUpAuthById( id, ( auth: any ) => {
-        if(auth==500) {
+        if(auth===500) {
             res.status(500).send('Failed to find document!');
         }
         else {

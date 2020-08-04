@@ -4,7 +4,6 @@ import * as admin from 'firebase-admin';
 admin.initializeApp();
 const fs = require( 'fs' );
 const {google} = require('googleapis');
-//const axios = require('axios')
 
 const OAuth2Client = google.auth.OAuth2
 const credentials_url = 'credentials.json';
@@ -12,7 +11,6 @@ const db = admin.firestore();
 const redirect_uri = "https://developers.google.com/oauthplayground";
 
 export const ModifyFirestoreTime = functions.https.onRequest((req, res) => {
-   
     db.collection('users').get()
     .then((snapshot) => {
         snapshot.forEach(doc => {
@@ -23,23 +21,23 @@ export const ModifyFirestoreTime = functions.https.onRequest((req, res) => {
                     start_day_and_time: string,
                     end_day_and_time: string
                 }) => { 
-                    if(gr["id"] === 'tshZhWZLHv8Dv1XbM3M4') {
-                        let startDate = new Date(gr["start_day_and_time"]).toLocaleString('en-US', {
-                            timeZone: "America/Los_Angeles"
-                        });
-                        let endDate = new Date(gr["end_day_and_time"]).toLocaleString('en-US', {
-                            timeZone: "America/Los_Angeles"
-                        });
+                    let startDate = new Date(gr["start_day_and_time"]).toLocaleString('en-US', {
+                        timeZone: "America/Los_Angeles"
+                    });
+                    let endDate = new Date(gr["end_day_and_time"]).toLocaleString('en-US', {
+                        timeZone: "America/Los_Angeles"
+                    });
+                    gr["start_day_and_time"] = startDate;
+                    gr["end_day_and_time"] = endDate;
 
-                        console.log(startDate);
-                        console.log(endDate);
-                    }
+                    db.collection("users")
+                    .doc(doc.id).update({ "goals&routines": arrs })
+                    .then()
+                    .catch((error) => {
+                        console.log('error in', doc.id);
+                    });
                 });
-                /*
-                db.collection("users")
-                .doc(doc.id)
-                .update({ "goals&routines": arrs });
-                */
+                console.log(doc.id);
             }
         });
         res.status(200).send('All good');
@@ -55,25 +53,14 @@ export const NotificationListener = functions
     .document('users/{userId}')
     .onUpdate( async (change, context) => {
 
-        interface notificationPayload { 
-                                        message : { 
-                                            data : { 
-                                                id: string
-                                            }
-                                        }, 
-                                        token: string 
-                                       }; 
-        
-        let payload: {
-            message: {data: {id: string}},
-            token: string
-        }                               
-        var notificationPayload = {} as notificationPayload
-        //var url = "https://fcm.googleapis.com/v1/projects/myspace-db/messages:send/";
         const userId = context.params.userId.toString();
-
         const newVal = change.after.data();
         const prevVal = change.before.data();
+
+        let payload: {
+            message: {data: {id: string}},
+            tokens: []
+        }                               
         let updateFlag = false;
         console.log('User ID:', userId);
 
@@ -91,7 +78,6 @@ export const NotificationListener = functions
                     break;
             }
         }
-        //console.log(updateFlag);
         if(updateFlag){
             if(!newVal.device_token){
                 console.log("User has no registered devices. Aborting.");
@@ -99,66 +85,34 @@ export const NotificationListener = functions
             }
             const deviceTokens = newVal.device_token;
             console.log('There are', deviceTokens.length, 'tokens to send notifications to.');
-            /*const message = {
-                data: {
-                    id: userId
-                },
-                android: {
-                    priority: "high"
-                }
-            };*/
-            for(i=0; i<deviceTokens.length; i++){
-                payload = {
-                    message: {data: {id: userId}},
-                    token: deviceTokens[i]
-                }
-                //notificationPayload.message = { data: {id: userId} };
-                //notificationPayload.token = deviceTokens[i];
-                console.log(payload);
+            
+            payload = {
+                message: {data: {id: userId}},
+                tokens: deviceTokens
             }
+        
+            const responses = await admin.messaging().sendMulticast(payload);
+            responses.responses.forEach((response, index) => {
+                const error = response.error;
+                if(error) {
+                    console.error('Failure sending notification to', deviceTokens[index], error);
+                    // Cleanup the tokens who are not registered anymore.
+                    if (error.code === 'messaging/invalid-registration-token' ||
+                        error.code === 'messaging/registration-token-not-registered') {
+                        deviceTokens.splice(index, 1);
+                    }
+                }
+            });
+            db.collection("users")
+                    .doc(userId).update({ "device_token": deviceTokens })
+                    .then((response) => {
+                        console.log('Updated device tokens');
+                    })
+                    .catch((error) => {
+                        console.log('error in', userId);
+                    });
         }
-
         return;
-        /*
-        const userId = context.params.userId.toString();
-        const newVal = change.after.data();
-
-        //Check the before update and after update GR data
-        if( JSON.stringify(change.before.data()['goals&routines']) === JSON.stringify(newVal['goals&routines']) ){
-            console.log('No change in goals/routines for ' ,userId, '. Aborting.')
-            return;
-        }
-
-        console.log('Change in goals/routines for ', userId);
-
-        if(!newVal.device_token){
-            console.log("User has no registered devices. Aborting.");
-            return;
-        }
-        const deviceTokens = newVal.device_token;
-        console.log('There are', deviceTokens.numChildren(), 'tokens to send notifications to.');
-
-        const message = {
-            data: {
-                id : 'V4NXgpBIq39PDOlSgwO1'
-            },
-            notification: {
-                title: 'Test push 1',
-                body: 'Test body'
-            }
-        };
-
-        const response = await admin.messaging().sendToDevice(deviceTokens,message);
-
-        response.results.forEach((result, index)=>{
-            const error = result.error;
-            if (error){
-                console.log('Error with token: ', deviceTokens[index])
-            }
-        });
-
-        return 200;
-        */
 });
 
 export const GetEventsForTheDay = functions.https.onRequest((req, res) => {

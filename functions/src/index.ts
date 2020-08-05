@@ -15,9 +15,9 @@ export const ModifyFirestoreTime = functions.https.onRequest((req, res) => {
     db.collection('users').get()
     .then((snapshot) => {
         snapshot.forEach(doc => {
-            if (doc.data()["goals&routines"] !== null) {
+            if (doc.data()["goals&routines"] !== undefined) {
                 let arrs = doc.data()["goals&routines"];
-                arrs.forEach((gr: {
+                arrs.forEach(async (gr: {
                     id: string,
                     start_day_and_time: string,
                     end_day_and_time: string
@@ -30,11 +30,13 @@ export const ModifyFirestoreTime = functions.https.onRequest((req, res) => {
                     });
                     gr["start_day_and_time"] = startDate;
                     gr["end_day_and_time"] = endDate;
-
-                    db.collection("users")
-                    .doc(doc.id).update({ "goals&routines": arrs })
-                    .then()
-                    .catch((error) => {
+                    
+                    await db.collection("users").doc(doc.id)
+                    .update({ "goals&routines": arrs })
+                    .then(() => {
+                        console.log('Update succesful', doc.id);
+                    })
+                    .catch(() => {
                         console.log('error in', doc.id);
                     });
                 });
@@ -111,15 +113,12 @@ export const NotificationListener = functions
                     validTokens.push(deviceTokens[index])
                 }
             });
-            db.collection("users")
-                .doc(userId).update({ "device_token": validTokens })
+             return db.collection("users").doc(userId).update({ "device_token": validTokens })
                 .then((response) => {
                     console.log('Updated device tokens');
-                    return;
                 })
                 .catch((error) => {
                     console.log('error in', userId);
-                    return;
                 });
         }
 });

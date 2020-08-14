@@ -1,7 +1,9 @@
 # Firestore-Backend
 
+For database updates from Watch Application (Project Caitlin) to MySpace Database.
+
 'functions' folder contains MySpace cloud functions code.
 
-Clone the repo, go inside 'functions folder' and do ```npm install```.
+1. ```npm install``` in the 'functions' fodler.
 
-Use firebase CLI for deploying: ```firebase deploy``` OR ```firebase deploy --only functions``` 
+2. Use firebase CLI for deploying: ```firebase deploy``` OR ```firebase deploy --only functions``` OR ```firebase deploy --only functions:SpecificFunctionName```
